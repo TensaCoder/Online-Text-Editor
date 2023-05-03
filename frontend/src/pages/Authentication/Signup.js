@@ -1,6 +1,9 @@
 import React, {useState} from 'react'
 import axios from 'axios'
 import "../../assets/auth.css"
+import { useNavigate } from "react-router-dom"
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css'
 
 const Signup = () => {
 
@@ -8,6 +11,8 @@ const Signup = () => {
     const [email, setEmail] = useState('jd@g.com');
     const [password, setPassword] = useState('12345678');
     const [confirmPassword, setConfirmPassword] = useState('12345678');
+    const navigate = useNavigate();
+
     // Get data before submitting
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -26,10 +31,16 @@ const Signup = () => {
             console.log(response);
             console.log(response.data.authToken)
             localStorage.setItem("authToken", response.data.authToken)
+            navigate("/notes");
 
         } catch (error) {
             // check if error.response.data is array(validation error) or json(user existing error)
             console.log(error.response.data)
+            toast.error('User already exists', {
+                position: "top-center",
+                autoClose: false,
+                closeOnClick: true,
+            });
         }
         
     }
@@ -120,6 +131,7 @@ const Signup = () => {
                     </p> */}
                 </div>
             </form>
+            <ToastContainer />
         </div>
     )
 

@@ -10,8 +10,8 @@ const NoteSchema = new Schema({
         type:String,
         required:true
     },
-    description:{
-        type:String,
+    contents: {
+        type: Object,
         required:true
     },
     timestamp:{

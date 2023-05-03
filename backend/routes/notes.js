@@ -3,6 +3,7 @@ const router = Router();
 const { body, validationResult } = require('express-validator');
 const fetchuser = require('../middleware/fetchuser');
 const Notes = require("../models/note")
+const Share = require("../models/share")
 
 // 1: Fetches all notes of the particular user using GET at /fetch-all-notes. Login Required
 router.get('/fetch-documents', fetchuser,
@@ -20,7 +21,6 @@ router.get('/fetch-documents', fetchuser,
 router.post('/add-document', fetchuser,
     [
         body('title').isLength({ min: 3 }),
-        body('description', 'Description should be atleast 8 character').isLength({ min: 8 })
     ],
     async (req, res) => {
         try {
@@ -29,14 +29,13 @@ router.post('/add-document', fetchuser,
             if (!errors.isEmpty()) {
                 return res.status(400).json({ errors: errors.array() });
             }
-            const { title, description, tag } = req.body;
+            const { title } = req.body;
 
             // Adds a new note to the Database
             const newNote = await Notes.create({
                 user: req.user.id,
                 title: title,
-                description: description,
-                tag: tag
+                contents: {data: ""}
             })
             res.send(newNote);
 
@@ -57,21 +56,13 @@ const io = require('socket.io')(3001, {
 const defaultValue = "";
 
 router.get('/document/:id', async (req, res) => {
-    const documentId = req.params.id;
-    const document = await findOrCreateDocument(documentId);
+    if (req.params.id == null) return;
 
-    io.on('connection', socket => {
-        socket.join(documentId);
-        socket.emit('load-document', document.data);
-
-        socket.on('send-changes', delta => {
-            socket.broadcast.to(documentId).emit('receive-changes', delta);
-        });
-
-        socket.on('save-document', async data => {
-            await Document.findByIdAndUpdate(documentId, { data });
-        });
-    });
+    const document = await Notes.findById(req.params.id);
+    if (document) res.json(document);
+    else{
+        console.log('doc error')
+    }
 });
 
 async function findOrCreateDocument(id) {
@@ -88,20 +79,21 @@ router.put('/update-document/:id', fetchuser,
     async (req, res) => {
 
         try {
-            const { title, description, tag } = req.body;
+            const { title, content} = req.body;
             let newNote = {};
             // Check the the incoming req has any items that need to be updated
             if (title) { newNote.title = title }
-            if (description) { newNote.description = description }
-            if (tag) { newNote.tag = tag }
+            if (content) { newNote.contents = content }
 
             // Will fetch the notes with the particular 'id' from the DB
             let note = await Notes.findById(req.params.id)
             if (!note) { return res.status(404).send("Not Found!!!") }
 
+            let sharedDoc = await Share.findOne({docId: req.params.id})
+            console.log(sharedDoc)
             // Checks if the sign in user is accessing his own notes only
-            if (req.user.id !== note.user.toString()) {
-                return res.status(401).send("Not Allowed!!!")
+            if (req.user.id !== note.user.toString() && sharedDoc == null) {
+                 return res.status(401).send("Not Allowed!!!")
             }
 
             // Now the user is accessing his own notes and will finally update the notes
@@ -130,14 +122,20 @@ router.delete("/delete-document/:id", fetchuser,
 
             // Checks if the sign in user is accessing his own notes only
             if (req.user.id !== note.user.toString()) {
-                return res.status(401).send("Not Allowed!!!")
+                let deletedDoc = await Share.deleteMany({docId:req.params.id})
+                let deletedDocument = await Notes.findByIdAndDelete(req.params.id)
+                res.json({ deletedDocument })
             }
 
-            // find the note to be deleted using the note id and not the user id
-            let deletedDocument = await Notes.findByIdAndDelete(req.params.id) // this will delete the document and return it as well
-            // let deletedNote = await Notes.deleteOne({_id : req.params.id})  // this will only delete the document but not return it
-
-            res.json({ deletedDocument })
+            else{
+                // find the note to be deleted using the note id and not the user id
+                 // this will delete the document and return it as well
+                // let deletedNote = await Notes.deleteOne({_id : req.params.id})  // this will only delete the document but not return it
+                let deletedDoc = await Share.deleteMany({docId:req.params.id})
+                let deletedDocument = await Notes.findByIdAndDelete(req.params.id)
+                res.json({ deletedDocument })
+            }
+            
 
         } catch (error) {
             console.error(error.message)

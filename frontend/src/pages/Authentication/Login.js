@@ -1,11 +1,17 @@
-import React, {useState} from 'react'
+import React, {useState, useEffect} from 'react'
 import axios from 'axios'
 import "../../assets/auth.css"
+import { useNavigate } from "react-router-dom"
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css'
+
 
 const Login = () => {
 
     const [email, setEmail] = useState('jd@g.com');
     const [password, setPassword] = useState('12345678');
+    const navigate = useNavigate();
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -17,16 +23,34 @@ const Login = () => {
 
         try {
             const response = await axios.post("http://localhost:6001/api/auth/login", data);
-            console.log(response);
-            console.log(response.data.authToken)
             localStorage.setItem("authToken", response.data.authToken)
+            const res = await axios.post("http://localhost:6001/api/auth/getuser", {}, {
+                headers: {
+                    authToken: localStorage.getItem("authToken")
+                }
+            });
+            if (res){
+                navigate("/notes");
+            }
+            
 
         } catch (error) {
             // check if error.response.data is array(validation error) or json(user existing error)
             console.log(error.response.data)
+            toast.error('User not found', {
+                position: "top-center",
+                autoClose: false,
+                closeOnClick: true,
+            });
         }
         
     }
+
+    const handleClick = () => {
+        navigate('/signup');
+    }
+
+
 
 
     const onChange = (e) =>{
@@ -86,10 +110,11 @@ const Login = () => {
                             <button type="submit" className="btn btn-primary" onClick={handleSubmit}>
                                 Submit
                             </button>
+                            <button type="submit" className="btn btn-primary" onClick={handleClick}>
+                                Sign Up
+                            </button>
                         </div>
-                        {/* <p className="text-center mt-2">
-                            Forgot <a href="#">password?</a>
-                        </p> */}
+                        <ToastContainer />
                     </div>
                 </form>
             </div>
